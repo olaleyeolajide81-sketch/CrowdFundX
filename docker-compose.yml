@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: crowdfundx-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: crowdfundx
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - crowdfundx-network
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: crowdfundx-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crowdfundx-network
+
+  # IPFS Node
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    container_name: crowdfundx-ipfs
+    restart: unless-stopped
+    ports:
+      - "4001:4001"     # P2P port
+      - "5001:5001"     # API port
+      - "8080:8080"     # Gateway port
+    volumes:
+      - ipfs_data:/data/ipfs
+    networks:
+      - crowdfundx-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: crowdfundx-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/crowdfundx?authSource=admin
+      REDIS_URL: redis://redis:6379
+      IPFS_API_URL: http://ipfs:5001
+      STELLAR_NETWORK: testnet
+      STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      STELLAR_SOROBAN_RPC_URL: https://soroban-testnet.stellar.org
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+      - redis
+      - ipfs
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - crowdfundx-network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: crowdfundx-frontend
+    restart: unless-stopped
+    environment:
+      REACT_APP_STELLAR_NETWORK: testnet
+      REACT_APP_HORIZON_URL: https://horizon-testnet.stellar.org
+      REACT_APP_API_URL: http://localhost:3001
+      REACT_APP_IPFS_GATEWAY: http://localhost:8080/ipfs/
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - crowdfundx-network
+
+  # Stellar Quickstart (for local testing)
+  stellar:
+    image: stellar/quickstart:latest
+    container_name: crowdfundx-stellar
+    restart: unless-stopped
+    environment:
+      - STELLAR_NETWORK=testnet
+    ports:
+      - "8000:8000"   # Horizon
+      - "8001:8001"   # Soroban RPC
+      - "8002:8002"   # Friendbot
+    volumes:
+      - stellar_data:/data
+    networks:
+      - crowdfundx-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  ipfs_data:
+    driver: local
+  stellar_data:
+    driver: local
+
+networks:
+  crowdfundx-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

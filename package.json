@@ -1,0 +1,51 @@
+{
+  "name": "crowdfundx",
+  "version": "1.0.0",
+  "description": "Decentralized crowdfunding platform built on Stellar",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend && npm run test:contracts",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test:contracts": "cd smart-contracts && cargo test",
+    "test:e2e": "cd tests/e2e_tests && npm test",
+    "deploy:contracts": "cd scripts && node deploy_contracts.js",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\""
+  },
+  "keywords": [
+    "stellar",
+    "blockchain",
+    "crowdfunding",
+    "web3",
+    "soroban",
+    "decentralized",
+    "fundraising"
+  ],
+  "author": "CrowdFundX Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/CrowdFundX.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/CrowdFundX/issues"
+  },
+  "homepage": "https://crowdfundx.io"
+}
