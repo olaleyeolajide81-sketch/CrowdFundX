@@ -25,6 +25,7 @@ A Web3 crowdfunding platform built on the Stellar blockchain, enabling transpare
     │ Storage │            │(MongoDB)│            │ API     │
     └─────────┘            └─────────┘            └─────────┘
 ```
+```
 
 ## 📁 Project Structure
 
@@ -71,7 +72,7 @@ CrowdFundX/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/your-org/CrowdFundX.git
+git clone https://github.com/olaleyeolajide81-sketch/CrowdFundX.git
 cd CrowdFundX
 ```
 
