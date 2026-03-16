@@ -1,0 +1,2 @@
+# CrowdFundX
+Decentralized Crowdfunding Platform
