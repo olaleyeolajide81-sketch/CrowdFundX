@@ -1,45 +1,24 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Users, TrendingUp } from 'lucide-react';
+import { Campaign } from '../types';
 
 interface CampaignCardProps {
-  campaign: {
-    _id: string;
-    title: string;
-    slug: string;
-    description: string;
-    fundingGoal: number;
-    currentFunding: number;
-    deadline: string;
-    creator: {
-      username: string;
-      firstName: string;
-      lastName: string;
-      avatar?: string;
-      isVerified?: boolean;
-    };
-    category: string;
-    featuredImage?: string;
-    status: string;
-    stats: {
-      views: number;
-      uniqueContributors: number;
-    };
-  };
+  campaign: Campaign;
 }
 
 const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
-  const progress = (campaign.currentFunding / campaign.fundingGoal) * 100;
-  const daysLeft = Math.ceil((new Date(campaign.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  const progress = (Number(campaign.current_funding) / Number(campaign.funding_goal)) * 100;
+  const daysLeft = Math.ceil((campaign.deadline - Date.now()) / (1000 * 60 * 60 * 24));
   
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-      <Link to={`/campaigns/${campaign.slug}`}>
+      <Link to={`/campaigns/${campaign.id}`}>
         {/* Campaign Image */}
         <div className="h-48 bg-gray-200 rounded-t-lg overflow-hidden">
-          {campaign.featuredImage ? (
+          {campaign.image_url ? (
             <img
-              src={campaign.featuredImage}
+              src={campaign.image_url}
               alt={campaign.title}
               className="w-full h-full object-cover"
             />
@@ -74,17 +53,10 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
             <div className="w-8 h-8 bg-gray-300 rounded-full mr-2"></div>
             <div>
               <p className="text-sm font-medium text-gray-900">
-                {campaign.creator.firstName} {campaign.creator.lastName}
+                {campaign.creator}
               </p>
-              <p className="text-xs text-gray-500">@{campaign.creator.username}</p>
+              <p className="text-xs text-gray-500">Creator</p>
             </div>
-            {campaign.creator.isVerified && (
-              <span className="ml-2 text-blue-500">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </span>
-            )}
           </div>
           
           {/* Progress Bar */}
@@ -105,11 +77,11 @@ const CampaignCard: React.FC<CampaignCardProps> = ({ campaign }) => {
           <div className="flex justify-between text-sm text-gray-600">
             <div className="flex items-center">
               <TrendingUp className="w-4 h-4 mr-1" />
-              <span>{campaign.currentFunding} / {campaign.fundingGoal}</span>
+              <span>{campaign.current_funding} / {campaign.funding_goal}</span>
             </div>
             <div className="flex items-center">
               <Users className="w-4 h-4 mr-1" />
-              <span>{campaign.stats.uniqueContributors}</span>
+              <span>0</span>
             </div>
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />

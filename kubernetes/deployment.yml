@@ -1,0 +1,388 @@
+# CrowdFundX Kubernetes Deployment Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crowdfundx-backend
+  namespace: crowdfundx
+  labels:
+    app: crowdfundx-backend
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: crowdfundx-backend
+  template:
+    metadata:
+      labels:
+        app: crowdfundx-backend
+        version: v1.0.0
+    spec:
+      containers:
+      - name: backend
+        image: crowdfundx/backend:latest
+        ports:
+        - containerPort: 3001
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: crowdfundx-secrets
+              key: mongodb-uri
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: crowdfundx-secrets
+              key: redis-url
+        - name: IPFS_API_URL
+          value: "http://ipfs-service:5001"
+        - name: STELLAR_NETWORK
+          value: "mainnet"
+        - name: STELLAR_HORIZON_URL
+          value: "https://horizon.stellar.org"
+        - name: STELLAR_SOROBAN_RPC_URL
+          value: "https://soroban.stellar.org"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: crowdfundx-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      imagePullSecrets:
+      - name: registry-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crowdfundx-backend-service
+  namespace: crowdfundx
+  labels:
+    app: crowdfundx-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+    name: http
+  selector:
+    app: crowdfundx-backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crowdfundx-frontend
+  namespace: crowdfundx
+  labels:
+    app: crowdfundx-frontend
+    version: v1.0.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: crowdfundx-frontend
+  template:
+    metadata:
+      labels:
+        app: crowdfundx-frontend
+        version: v1.0.0
+    spec:
+      containers:
+      - name: frontend
+        image: crowdfundx/frontend:latest
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        env:
+        - name: VITE_STELLAR_NETWORK
+          value: "mainnet"
+        - name: VITE_STELLAR_RPC_URL
+          value: "https://horizon.stellar.org"
+        - name: VITE_SOROBAN_RPC_URL
+          value: "https://soroban.stellar.org"
+        - name: VITE_API_URL
+          value: "https://api.crowdfundx.io"
+        - name: VITE_IPFS_GATEWAY
+          value: "https://ipfs.crowdfundx.io"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crowdfundx-frontend-service
+  namespace: crowdfundx
+  labels:
+    app: crowdfundx-frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: crowdfundx-frontend
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crowdfundx-ingress
+  namespace: crowdfundx
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - crowdfundx.io
+    - api.crowdfundx.io
+    secretName: crowdfundx-tls
+  rules:
+  - host: crowdfundx.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: crowdfundx-frontend-service
+            port:
+              number: 80
+  - host: api.crowdfundx.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: crowdfundx-backend-service
+            port:
+              number: 3001
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crowdfundx
+  labels:
+    name: crowdfundx
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crowdfundx-secrets
+  namespace: crowdfundx
+type: Opaque
+data:
+  # Base64 encoded values
+  mongodb-uri: bW9uZ29kYjovL2FkbWluOnBhc3N3b3JkQG1vbmdvZGItc2VydmljZToyNzAxNy9jcm93ZGZ1bmR4P2F1dGhTb3VyY2U9YWRtaW4=
+  redis-url: cmVkaXM6Ly9yZWRpcy1zZXJ2aWNlOjYzNzk=
+  jwt-secret: c3VwZXJfc2VjdXJlX2p3dF9zZWNyZXRfZm9yX3Byb2R1Y3Rpb24=
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: crowdfundx-backend-pdb
+  namespace: crowdfundx
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: crowdfundx-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: crowdfundx-frontend-pdb
+  namespace: crowdfundx
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: crowdfundx-frontend
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: crowdfundx-backend-hpa
+  namespace: crowdfundx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: crowdfundx-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: crowdfundx-frontend-hpa
+  namespace: crowdfundx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: crowdfundx-frontend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crowdfundx-config
+  namespace: crowdfundx
+data:
+  app_name: "CrowdFundX"
+  app_version: "1.0.0"
+  log_level: "info"
+  cors_origins: "https://crowdfundx.io,https://www.crowdfundx.io"
+  rate_limit_window: "900000"
+  rate_limit_max: "100"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crowdfundx-cleanup
+  namespace: crowdfundx
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: crowdfundx/backend:latest
+            command: ["node", "scripts/cleanup.js"]
+            env:
+            - name: NODE_ENV
+              value: "production"
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: crowdfundx-secrets
+                  key: mongodb-uri
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
